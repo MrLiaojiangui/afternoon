@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!--引入数据库属性配置文件-->
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations" value="classpath:db.properties"/>
+    </bean>
+    <!--引入Spring注解-->
+    <context:component-scan base-package="com.mica"/>
+
+    <!--使用第二种方式配置hibernate数据库的sessionFactory
+    即 在Spring的配置文件中定义数据库相关配置 此种方式就不需要
+    单独的hibernate配置文件了
+    -->
+    <!--1,配置DataSource:dbcp-->
+    <bean id="dataSource"
+          class="org.apache.commons.dbcp.BasicDataSource">
+        <!--指定数据库连接属性-->
+        <!--数据库驱动类-->
+        <property name="driverClassName" value="${driverClass}"/>
+        <!--数据库连接地址-->
+        <property name="url" value="${url}"/>
+        <!--数据库访问的用户名-->
+        <property name="username" value="${username}"/>
+        <!--数据库访问密码-->
+        <property name="password" value="${password}"/>
+    </bean>
+    <!--2.配置sessionFactory-->
+    <bean id="sessionFactory"
+          class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+        <!--引入数据源-->
+        <property name="dataSource" ref="dataSource"/>
+        <!--配置hibernate的可选项-->
+        <property name="hibernateProperties">
+            <props>
+                <prop key="hibernate.hbm2ddl.auto">update</prop>
+                <prop key="hibernate.show_sql">true</prop>
+                <prop key="hibernate.format_sql">true</prop>
+                <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
+            </props>
+        </property>
+        <!--引入mapping文件 通过通配符做批量导入-->
+        <property name="mappingLocations" value="classpath*:mapping/*.hbm.xml"/>
+    </bean>
+    <!--3.配置HibernateTemplate-->
+    <bean id="hibernateTemplate"
+          class="org.springframework.orm.hibernate4.HibernateTemplate">
+        <!--引入sessionFactory-->
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+    <!--Spring AOP编程配置 切入数据库事务-->
+    <!--4.配置事务对象 配置切面-->
+    <bean id="transactionManager"
+          class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+        <!--引入数据库连接工厂类对象-->
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+    <!--5.配置通知-->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!--定义目标方法-->
+        <tx:attributes>
+            <tx:method name="*"/>
+        </tx:attributes>
+    </tx:advice>
+    <!--6.配置AOP-->
+    <aop:config>
+        <!--配置切入点-->
+        <!--切入的目标方法为service包及其子包下的所有方法-->
+        <aop:pointcut id="pointCut" expression="execution(* com.mica.service..*.*(..))"/>
+        <!--引入通知-->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="pointCut"/>
+    </aop:config>
+</beans>
